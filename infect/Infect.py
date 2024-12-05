@@ -10,12 +10,15 @@ BG_COLOR = pygame.Color(0, 0, 0)
 TEXT_COLOR = pygame.Color(255, 255, 255)
 current_dir = Path(__file__).resolve().parent
 picture_path = [
-    str(current_dir) + "\\..\\static\\treeBall.png",
     str(current_dir) + "\\..\\static\\empty.png",
+    str(current_dir) + "\\..\\static\\treeBall.png",
     str(current_dir) + "\\..\\static\\fireBall.png",
     str(current_dir) + "\\..\\static\\waterBall.png",
-    str(current_dir) + "\\..\\static\\waterBallSelected.png"
+    str(current_dir) + "\\..\\static\\treeBallSelected.png",
+    str(current_dir) + "\\..\\static\\fireBallSelected.png",
+    str(current_dir) + "\\..\\static\\waterBallSelected.png",
 ]
+PLAYER_CLASS = 'WaterBall'
 
 
 class MainGame:
@@ -26,53 +29,33 @@ class MainGame:
         self.my_ball = None
         self.mouse_x = 0
         self.mouse_y = 0
-        # self.water_balls_list = []
-        # self.fire_balls_list = []
         self.water_balls_list = []
         self.fire_balls_list = []
+        self.tree_balls_list = []
         self.all_balls_list = []
         self.water_group: pygame.sprite.Group = pygame.sprite.Group()
         self.fire_group: pygame.sprite.Group = pygame.sprite.Group()
+        self.tree_group: pygame.sprite.Group = pygame.sprite.Group()
 
     @staticmethod
     def printt():
         print('=================================================================')
 
     def start_game(self):
-        clock = pygame.time.Clock()
         self.init_game()
         while True:
             self.window.fill(BG_COLOR)
             self.window. \
                 blit(pygame.font.SysFont("kaiti", 18).render("时间", True, TEXT_COLOR), (SCREEN_WEIGHT / 2 - 50, 10))
-            self.my_ball.move()
-
-            list1 = self.not_vanish_collision(self.water_group, self.water_group)
-            collision_dirt = list1[0]
-            key_list = list1[1]
-            if collision_dirt:
-                for ball in key_list:
-                    if len(collision_dirt.get(ball)) > 1:
-                        # print(ball)
-                        ball.collision_state = True
-            else:
-                print(self.water_balls_list)
-                for ball in self.water_balls_list:
-                    ball.collision_state = False
-
-            # 获取发生碰撞的所有water_ball fire_ball
-            collisions_balls_list = self.vanish_collision(self.water_group, self.fire_group)
-            water_ball_collision_list = collisions_balls_list[1]
-            fire_ball_collision_list = collisions_balls_list[2]
-
-            # 改变与water_ball发生碰撞的所有fire_ball的property
-            self.property_change(fire_ball_collision_list)
-            # 将改变后的fire_ball添加到 water_ball_group 与 water_balls_list中
-            self.water_group.add(*fire_ball_collision_list)
-            if len(fire_ball_collision_list) != 0:
-                self.water_balls_list.extend(fire_ball_collision_list)
-            # 删除该改变property的元素
-            self.fire_balls_list = self.delete_balls_from_ball_list(self.fire_balls_list, fire_ball_collision_list)
+            for water_ball in self.water_balls_list:
+                water_ball.move()
+            # 对发生碰撞的Ball重新分配其list
+            self.redistribute_collision_balls(self.water_group, self.fire_group)
+            # 改变发生碰撞的无敌害作用的Ball碰撞状态
+            self.change_collision_state(self.water_group, self.water_group)
+            self.change_collision_state(self.tree_group, self.tree_group)
+            self.change_collision_state(self.fire_group, self.fire_group)
+            self.change_collision_state(self.water_group, self.tree_group)
             # 绘制Ball
             for ball in self.all_balls_list:
                 ball.display_ball(self)
@@ -98,7 +81,6 @@ class MainGame:
                                 water_ball.state = 'unselected'
                 self.move_ball()
             self.move_ball()
-            # clock.tick(10)
             pygame.display.flip()
 
     def init_game(self):
@@ -111,6 +93,8 @@ class MainGame:
         self.water_balls_list.append(self.my_ball)
         # 生成fire_ball
         self.fire_balls_list = self.fire_balls_generate()
+        # 生成tree_ball
+        self.tree_balls_list = self.tree_balls_generate()
         # 将所有Ball添加到all_balls_list
         self.ball_lists_gather()
         # 将所有Ball添加到各自的精灵group
@@ -125,24 +109,61 @@ class MainGame:
     def move_ball(self):
         self.mouse_x = pygame.mouse.get_pos()[0]
         self.mouse_y = pygame.mouse.get_pos()[1]
-        ball_position_range = self.my_ball.ball_position_range()
-        if self.position_in_range(ball_position_range):
-            self.my_ball.moving = False
-        else:
-            self.my_ball.moving = True
-            dist = [self.mouse_x - ball_position_range[4], self.mouse_y - ball_position_range[5]]
-            result = math.sqrt(dist[0] ** 2 + dist[1] ** 2)
-            self.my_ball.x_speed_ratio = dist[0] / result
-            self.my_ball.y_speed_ratio = dist[1] / result
+        for water_ball in self.water_balls_list:
+            ball_position_range = water_ball.ball_position_range()
+            if self.position_in_range(ball_position_range):
+                water_ball.moving = False
+            else:
+                water_ball.moving = True
+                dist = [self.mouse_x - ball_position_range[4], self.mouse_y - ball_position_range[5]]
+                result = math.sqrt(dist[0] ** 2 + dist[1] ** 2)
+                water_ball.x_speed_ratio = dist[0] / result
+                water_ball.y_speed_ratio = dist[1] / result
+
+    # 该函数应用于相同的group1 和 group2相同,后续进行修改使其具有普遍性
+    def change_collision_state(self, ball_group1, balls_group2):
+        list1 = self.not_vanish_collision(ball_group1, balls_group2)
+        collision_dirt = list1[0]
+        key_list = list1[1]
+        if collision_dirt:
+            if ball_group1 == balls_group2:
+                for ball in key_list:
+                    if len(collision_dirt.get(ball)) > 1:
+                        ball.collision_state = True
+            else:
+                for ball in key_list:
+                    if len(collision_dirt.get(ball)) > 0:
+                        ball.collision_state = True
+
+    def redistribute_collision_balls(self, group1, group2):
+        # 获取发生碰撞的所有water_ball fire_ball
+        collisions_balls_list = self.vanish_collision(group1, group2)
+        ball_collision_list = collisions_balls_list[2]
+        if len(ball_collision_list) != 0:
+            # 改变与water_ball发生碰撞的所有fire_ball的property
+            self.property_change(ball_collision_list)
+            # 将改变后的fire_ball添加到 water_ball_group 与 water_balls_list中
+            self.water_group.add(*ball_collision_list)
+            self.water_balls_list.extend(ball_collision_list)
+            # 删除该改变property的元素
+            self.fire_balls_list = self.delete_balls_from_ball_list(self.fire_balls_list, ball_collision_list)
 
     @staticmethod
     def fire_balls_generate():
         fire_balls_list = []
         for i in range(3):
-            fire_ball = FireBall(random.randrange(SCREEN_WEIGHT + 40), random.randrange(SCREEN_HEIGHT - 40))
+            fire_ball = FireBall(random.randrange(SCREEN_WEIGHT + 40), random.randrange(SCREEN_HEIGHT - 50))
             fire_balls_list.append(fire_ball)
         return fire_balls_list
         # self.all_balls_list.append(fire_ball)
+
+    @staticmethod
+    def tree_balls_generate():
+        tree_balls_list = []
+        for i in range(3):
+            tree_ball = TreeBall(random.randrange(SCREEN_WEIGHT + 40), random.randrange(SCREEN_HEIGHT - 50))
+            tree_balls_list.append(tree_ball)
+        return tree_balls_list
 
     @staticmethod
     def vanish_collision(water_group, fire_group):
@@ -160,17 +181,27 @@ class MainGame:
         return [collision_dict, sprites_from_group1, sprites_from_group2]
 
     @staticmethod
-    def property_change(fire_ball_collision_list):
-        for fire_ball in fire_ball_collision_list:
-            fire_ball.property = 'waterBall'
+    def property_change(ball_collision_list):
+        tmp_ball = ball_collision_list[0]
+        if isinstance(tmp_ball, FireBall):
+            for ball in ball_collision_list:
+                ball.property = 'waterBall'
+        elif isinstance(tmp_ball, WaterBall):
+            for ball in ball_collision_list:
+                ball.property = 'treeBall'
+        else:
+            for ball in ball_collision_list:
+                ball.property = 'fireBall'
 
     def ball_lists_gather(self):
         self.all_balls_list.extend(self.water_balls_list)
         self.all_balls_list.extend(self.fire_balls_list)
+        self.all_balls_list.extend(self.tree_balls_list)
 
     def add_ball_to_group(self):
         self.water_group.add(*self.water_balls_list)
         self.fire_group.add(*self.fire_balls_list)
+        self.tree_group.add(*self.tree_balls_list)
 
     @staticmethod
     def delete_balls_from_ball_list(original_list, removal_list):
@@ -187,13 +218,15 @@ class Ball(pygame.sprite.Sprite):
     def __init__(self, left, top):
         super().__init__()
         self.property_images = {
-            'empty': pygame.image.load(picture_path[1]),
+            'empty': pygame.image.load(picture_path[0]),
+            'treeBall': pygame.image.load(picture_path[1]),
             'fireBall': pygame.image.load(picture_path[2]),
-            'waterBall': pygame.image.load(picture_path[3]),
+            'waterBall': pygame.image.load(picture_path[3])
         }
         self.state_images = {
-            'waterBallSelected': pygame.image.load(picture_path[4]),
-            'fireBallSelected': pygame.image.load(picture_path[1]),
+            'waterBallSelected': pygame.image.load(picture_path[6]),
+            'fireBallSelected': pygame.image.load(picture_path[5]),
+            'treeBallSelected': pygame.image.load(picture_path[4]),
             # 'selected': pygame.image.load(picture_path[0]),
             # 'unselected': pygame.image.load(picture_path[1]),
         }
@@ -218,14 +251,15 @@ class Ball(pygame.sprite.Sprite):
         self.y_speed_ratio = float(0)
         # 碰撞状态
         self.collision_state = False
-        self.previous_position_list = []
+        self.previous_position_list = [self.rect.left, self.rect.top]
+        self.previous_position_list = [self.rect.left, self.rect.top]
 
     def move(self):
         if self.collision_state is True:
-            self.rect.left = self.previous_position_list[0]
-            self.rect.top = self.previous_position_list[1]
+            self.rect.left = self.previous_position_list[0] - self.x_speed_ratio * 2
+            self.rect.top = self.previous_position_list[1] - self.y_speed_ratio * 2
             self.collision_state = False
-        elif self.moving is True and self.state == 'selected':
+        elif PLAYER_CLASS == 'WaterBall' and self.moving is True and self.state == 'selected':
             self.previous_position_list = self.previous_position()
             self.rect.top += self.speed * self.y_speed_ratio
             self.rect.left += self.speed * self.x_speed_ratio
@@ -270,18 +304,24 @@ class Ball(pygame.sprite.Sprite):
         pass
 
 
-class FireBall(Ball):
+class FireBall(Ball, pygame.sprite.Sprite):
     def __init__(self, left, top):
         super().__init__(left, top)
         self.property = 'fireBall'
-        self.property = 'fireBall'
-        self.state = 'unselected'
+        self.state = 'selected'
 
 
 class WaterBall(Ball, pygame.sprite.Sprite):
     def __init__(self, left, top):
         super().__init__(left, top)
         self.property = 'waterBall'
+
+
+class TreeBall(Ball, pygame.sprite.Sprite):
+    def __init__(self, left, top):
+        super().__init__(left, top)
+        self.property = 'treeBall'
+        self.state = 'selected'
 
 
 if __name__ == '__main__':
