@@ -10,13 +10,14 @@ BG_COLOR = pygame.Color(0, 0, 0)
 TEXT_COLOR = pygame.Color(255, 255, 255)
 current_dir = Path(__file__).resolve().parent
 picture_path = [
-    str(current_dir) + "\\..\\static\\empty.png",
+    str(current_dir) + "\\..\\static\\water.png",
     str(current_dir) + "\\..\\static\\treeBall.png",
     str(current_dir) + "\\..\\static\\fireBall.png",
     str(current_dir) + "\\..\\static\\waterBall.png",
     str(current_dir) + "\\..\\static\\treeBallSelected.png",
     str(current_dir) + "\\..\\static\\fireBallSelected.png",
     str(current_dir) + "\\..\\static\\waterBallSelected.png",
+    str(current_dir) + "\\..\\static\\pot.png",
 ]
 PLAYER_CLASS = 'WaterBall'
 
@@ -24,11 +25,14 @@ PLAYER_CLASS = 'WaterBall'
 class MainGame:
     def __init__(self):
         self.window = None
+        self.pot = False
         self.game_name = "Infect"
         self.version = "V1.1"
         self.my_ball = None
         self.mouse_x = 0
         self.mouse_y = 0
+        self.ctrl_held = False
+        self.shift_held = False
         self.water_balls_list = []
         self.fire_balls_list = []
         self.tree_balls_list = []
@@ -57,30 +61,23 @@ class MainGame:
             self.change_collision_state(self.fire_group, self.fire_group)
             self.change_collision_state(self.water_group, self.tree_group)
             # 绘制Ball
+            if self.pot is True:
+                self.display_pot(self.mouse_x, self.mouse_y)
             for ball in self.all_balls_list:
                 ball.display_ball(self)
-            # 循环获取事件，监听事件状态
-            for event in pygame.event.get():
-                self.mouse_x = pygame.mouse.get_pos()[0]
-                self.mouse_y = pygame.mouse.get_pos()[1]
-                # 判断用户是否点了"X"关闭按钮,并执行if代码段
-                if event.type == pygame.QUIT:
-                    # 卸载所有模块
-                    pygame.quit()
-                    # 终止程序，确保退出程序
-                    sys.exit()
-                elif event.type == pygame.MOUSEBUTTONUP:
-                    # Ball的位置范围
-                    # 判断鼠标位置是否在Ball内
-                    for water_ball in self.water_balls_list:
-                        ball_position_range = water_ball.ball_position_range()
-                        if self.position_in_range(ball_position_range):
-                            if water_ball.state == 'unselected':
-                                water_ball.state = 'selected'
-                            elif water_ball.state == 'selected':
-                                water_ball.state = 'unselected'
+                # 监听事件状态
+                self.event_listen()
+            if self.shift_held is False and self.ctrl_held is False:
+
+                # mouse_x =
+                # mouse_y =
+                for water_ball in self.water_balls_list:
+                    if water_ball.state == 'selected':
+                        water_ball.want_x = pygame.mouse.get_pos()[0]
+                        water_ball.want_y = pygame.mouse.get_pos()[1]
                 self.move_ball()
-            self.move_ball()
+            else:
+                self.move_ball()
             pygame.display.flip()
 
     def init_game(self):
@@ -102,23 +99,97 @@ class MainGame:
         # 设置窗口的标题，即游戏名称
         pygame.display.set_caption(self.game_name + "   " + self.version)
 
-    def position_in_range(self, ball_position_range):
-        return ball_position_range[0] <= self.mouse_x <= ball_position_range[2] and \
-            ball_position_range[1] <= self.mouse_y <= ball_position_range[3]
+    def event_listen(self):
+        for event in pygame.event.get():
+            # self.mouse_x = pygame.mouse.get_pos()[0]
+            # self.mouse_y = pygame.mouse.get_pos()[1]
+            # 判断用户是否点了"X"关闭按钮,并执行if代码段
+            if event.type == pygame.QUIT:
+                # 卸载所有模块
+                pygame.quit()
+                # 终止程序，确保退出程序
+                sys.exit()
+
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_LCTRL:
+                    self.ctrl_held = True
+                elif event.key == 1073742049:
+                    if self.shift_held is False:
+                        self.shift_held = True
+                    else:
+                        self.shift_held = False
+                        self.pot = False
+
+            if self.ctrl_held is True:
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    # Ball的位置范围
+                    # 判断鼠标位置是否在Ball内
+                    if event.button == 1:
+
+                        for water_ball in self.water_balls_list:
+                            mouse_x = pygame.mouse.get_pos()[0]
+                            mouse_y = pygame.mouse.get_pos()[1]
+                            ball_position_range = water_ball.ball_position_range()
+                            if self.position_in_range(ball_position_range, mouse_x, mouse_y):
+                                if water_ball.state == 'unselected':
+                                    water_ball.state = 'selected'
+                                elif water_ball.state == 'selected':
+                                    water_ball.state = 'unselected'
+
+                elif event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_a:
+                        for water_ball in self.water_balls_list:
+                            water_ball.state = 'selected'
+                    elif event.key == pygame.K_s:
+                        for water_ball in self.water_balls_list:
+                            water_ball.state = 'unselected'
+                            water_ball.moving = False
+                elif event.type == pygame.KEYUP:
+                    if event.key == pygame.K_LCTRL:
+                        self.ctrl_held = False
+
+            if self.shift_held is True:
+                if event.type == pygame.MOUSEBUTTONDOWN:
+                    if event.button == 3:
+                        self.mouse_x = pygame.mouse.get_pos()[0]
+                        self.mouse_y = pygame.mouse.get_pos()[1]
+                        self.pot = True
+                        mouse_x = self.mouse_x
+                        mouse_y = self.mouse_y
+                        for water_ball in self.water_balls_list:
+                            if water_ball.state == 'selected':
+                                water_ball.want_x = mouse_x
+                                water_ball.want_y = mouse_y
+
+            if self.shift_held is False and self.ctrl_held is False:
+                mouse_x = pygame.mouse.get_pos()[0]
+                mouse_y = pygame.mouse.get_pos()[1]
+                for water_ball in self.water_balls_list:
+                    water_ball.want_x = mouse_x
+                    water_ball.want_x = mouse_y
+                self.move_ball()
+
+    @staticmethod
+    def position_in_range(ball_position_range, mouse_x, mouse_y):
+        return ball_position_range[0] <= mouse_x <= ball_position_range[2] and \
+            ball_position_range[1] <= mouse_y <= ball_position_range[3]
 
     def move_ball(self):
-        self.mouse_x = pygame.mouse.get_pos()[0]
-        self.mouse_y = pygame.mouse.get_pos()[1]
         for water_ball in self.water_balls_list:
             ball_position_range = water_ball.ball_position_range()
-            if self.position_in_range(ball_position_range):
+            if self.position_in_range(ball_position_range, water_ball.want_x, water_ball.want_y):
                 water_ball.moving = False
+                self.pot = False
             else:
                 water_ball.moving = True
-                dist = [self.mouse_x - ball_position_range[4], self.mouse_y - ball_position_range[5]]
+                dist = [water_ball.want_x - ball_position_range[4], water_ball.want_y - ball_position_range[5]]
                 result = math.sqrt(dist[0] ** 2 + dist[1] ** 2)
-                water_ball.x_speed_ratio = dist[0] / result
-                water_ball.y_speed_ratio = dist[1] / result
+                if result != 0:
+                    water_ball.x_speed_ratio = dist[0] / result
+                    water_ball.y_speed_ratio = dist[1] / result
+                else:
+                    water_ball.x_speed_ratio = 0
+                    water_ball.y_speed_ratio = 0
 
     # 该函数应用于相同的group1 和 group2相同,后续进行修改使其具有普遍性
     def change_collision_state(self, ball_group1, balls_group2):
@@ -128,12 +199,39 @@ class MainGame:
         if collision_dirt:
             if ball_group1 == balls_group2:
                 for ball in key_list:
-                    if len(collision_dirt.get(ball)) > 1:
+                    collision_list = collision_dirt.get(ball)
+                    if len(collision_list) > 1:
                         ball.collision_state = True
+                        for collided_ball in collision_list:
+                            if ball != collided_ball:
+                                # 调整球的位置，避免重叠
+                                self.resolve_overlap(ball, collided_ball)
             else:
                 for ball in key_list:
-                    if len(collision_dirt.get(ball)) > 0:
+                    collision_list = collision_dirt.get(ball)
+                    if len(collision_list) > 0:
                         ball.collision_state = True
+                        for collided_ball in collision_list:
+                            if ball != collided_ball:
+                                # 调整球的位置，避免重叠
+                                self.resolve_overlap(ball, collided_ball)
+
+    @staticmethod
+    def resolve_overlap(ball1, ball2):
+        overlap_x = ball1.rect.centerx - ball2.rect.centerx
+        overlap_y = ball1.rect.centery - ball2.rect.centery
+        total_overlap = abs(overlap_x) + abs(overlap_y)
+
+        if total_overlap == 0:
+            pass
+            ball1.move()
+
+        else:
+            # 按比例分离两个小球
+            offset_x = (overlap_x / total_overlap) * 2
+            offset_y = (overlap_y / total_overlap) * 2
+            ball1.collision_excursion(offset_x, offset_y)
+            ball2.collision_excursion(offset_x, offset_y)
 
     def redistribute_collision_balls(self, group1, group2):
         # 获取发生碰撞的所有water_ball fire_ball
@@ -151,7 +249,7 @@ class MainGame:
     @staticmethod
     def fire_balls_generate():
         fire_balls_list = []
-        for i in range(3):
+        for i in range(10):
             fire_ball = FireBall(random.randrange(SCREEN_WEIGHT + 40), random.randrange(SCREEN_HEIGHT - 50))
             fire_balls_list.append(fire_ball)
         return fire_balls_list
@@ -212,6 +310,13 @@ class MainGame:
             final_list = new_list
         return final_list
 
+    def display_pot(self, mouse_x, mouse_y):
+        image = pygame.image.load(picture_path[7])
+        rect = image.get_rect()
+        rect.centerx = mouse_x
+        rect.centery = mouse_y
+        self.window.blit(image, rect)
+
 
 class Ball(pygame.sprite.Sprite):
     # 位置初始化
@@ -233,6 +338,7 @@ class Ball(pygame.sprite.Sprite):
         # 选中状态
         self.state = "selected"
         self.property = 'empty'
+
         # 根据选中属性加载图片
         self.image = self.property_images[self.property]
         # 根据图片获取区域
@@ -244,6 +350,8 @@ class Ball(pygame.sprite.Sprite):
         self.top = top
         self.rect.left = left
         self.rect.top = top
+        self.want_x = left
+        self.want_y = top
         # 移动状态
         self.moving = False
         self.speed = 1
@@ -256,8 +364,7 @@ class Ball(pygame.sprite.Sprite):
 
     def move(self):
         if self.collision_state is True:
-            self.rect.left = self.previous_position_list[0] - self.x_speed_ratio * 2
-            self.rect.top = self.previous_position_list[1] - self.y_speed_ratio * 2
+            self.move_to_previous_position()
             self.collision_state = False
         elif PLAYER_CLASS == 'WaterBall' and self.moving is True and self.state == 'selected':
             self.previous_position_list = self.previous_position()
@@ -267,6 +374,21 @@ class Ball(pygame.sprite.Sprite):
             self.rect.top = min(SCREEN_HEIGHT - self.size[0], self.rect.top)
             self.rect.left = max(0, self.rect.left)
             self.rect.left = min(SCREEN_WEIGHT - self.size[1], self.rect.left)
+
+    def move_to_previous_position(self):
+        self.rect.left = self.previous_position_list[0] + self.x_speed_ratio
+        self.rect.top = self.previous_position_list[1] + self.y_speed_ratio
+
+    def collision_excursion(self, offset_x, offset_y):
+        if self.collision_state is True and self.state == 'selected':
+            self.previous_position()
+            self.rect.move_ip(offset_x, offset_y)
+            self.rect.top = max(0, self.rect.top)
+            self.rect.top = min(SCREEN_HEIGHT - self.size[0], self.rect.top)
+            self.rect.left = max(0, self.rect.left)
+            self.rect.left = min(SCREEN_WEIGHT - self.size[1], self.rect.left)
+
+            self.collision_state = False
 
     def display_ball(self, main_game):
         # 获取展示的对象
